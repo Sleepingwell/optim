@@ -114,8 +114,8 @@ namespace optim {
         DefaultBoundsAdjustor(NT CMCR, NT PAR, NT jitter) 
           : CMCR_(CMCR), PAR_(PAR), jitter_(jitter) 
         {
-            assert(0.0 <= cmcr && cmcr <= 1.0);
-            assert(0.0 <=  par && par  <= 1.0);
+            assert(0.0 <= CMCR && CMCR <= 1.0);
+            assert(0.0 <=  PAR && PAR  <= 1.0);
             assert(jitter < 1.0);
         }
 
