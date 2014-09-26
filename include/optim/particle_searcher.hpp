@@ -53,8 +53,8 @@ namespace optim {
     public:
         ParticleSearcher(
             bounds_type const& bounds,
-            BoundsAdjustor& boundsAdjustor,
-            Stopper& stopper,
+            BoundsAdjustor const& boundsAdjustor,
+            Stopper const& stopper,
             size_t nParticles
         ) : bounds_(bounds),
             stopper_(stopper),
@@ -148,9 +148,9 @@ namespace optim {
 
     private:
         Generator gen_;
-        bounds_type const& bounds_;
-        BoundsAdjustor& boundsAdjustor_;
-        Stopper& stopper_;
+        bounds_type bounds_;
+        BoundsAdjustor boundsAdjustor_;
+        Stopper stopper_;
         particle_store_type particles_;
         best_particle_store_type bestStore_;
         size_t worstParticleIndex_;

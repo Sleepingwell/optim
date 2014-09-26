@@ -84,13 +84,27 @@ namespace optim {
                 Bounds
             > Base;
 
-            friend class Base;
+            typedef typename Base::bounds_type bounds_type;
+            typedef typename Base::particle_type particle_type;
+            typedef typename Base::particle_store_type particle_store_type;
+
+            friend class ParticleSearcher<
+                ChargedParticleSearcher<XT, YT, BoundsAdjustor, Stopper, Bounds, Generator>,
+                XT,
+                YT,
+                ParticleImpl<XT, YT>,
+                Result<XT, YT>,
+                BoundsAdjustor,
+                Stopper,
+                Generator,
+                Bounds
+            >;
 
         public:
             ChargedParticleSearcher(
                 bounds_type const& bounds,
-                BoundsAdjustor& boundsAdjustor,
-                Stopper& stopper,
+                BoundsAdjustor const& boundsAdjustor,
+                Stopper const& stopper,
                 size_t nParticles,
                 XT a
             ) : Base(bounds, boundsAdjustor, stopper, nParticles), a_(a)
@@ -98,7 +112,7 @@ namespace optim {
                 typedef typename bounds_type::const_iterator Iter;
                 // from equation 21.
                 if(a <= 0.0) {
-                    for(Iter i(getBounds().begin()); i!=getBounds().end(); ++i) a_ = std::max(a_, i->second - i->first);
+                    for(Iter i(this->getBounds().begin()); i!=this->getBounds().end(); ++i) a_ = std::max(a_, i->second - i->first);
                     a_ *= 0.1;           
                 }
             }
@@ -106,7 +120,6 @@ namespace optim {
         private:
             // rules 4, 5 (equations 25, 26)
             // - implemented together as a proceedure for the sake of efficiency
-            template<typename Generator> //typename ParticleStore, typename NT, typename Generator>
             void updateParticle(
                 particle_type& j,
                 size_t iter, 
@@ -181,9 +194,9 @@ namespace optim {
 
 template<typename XT, typename YT, typename FUNC, typename Bounds>
 typename optim::CPS::ChargedParticleSearcher<XT, YT, optim::DefaultBoundsAdjustor<XT>, optim::DefaultStoppingRule, Bounds>::result_type chargedParticleOptimise(
-    FUNC& func, 
-    Bounds& bounds, 
-    size_t nIters, 
+    FUNC const& func,
+    Bounds const& bounds,
+    size_t nIters,
     size_t nParticles,
     XT cmcr=0.5, 
     XT par=0.1, 

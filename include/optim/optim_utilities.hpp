@@ -202,7 +202,7 @@ namespace optim {
         BestStoreImpl(size_t size) : maxSize_(size) {}
 
         bool addToStore(particle_type const& particle) {
-            typedef BestVector::iterator Iter;
+            typedef typename BestVector::iterator Iter;
             bool inserted(false);
             if(bestVector_.size() < maxSize_) {
                 bestVector_.insert(particle);
@@ -210,14 +210,17 @@ namespace optim {
             }
             Iter insertAt(bestVector_.upper_bound(particle));
             if(!inserted && insertAt!=bestVector_.end()) {
-                *insertAt = particle;
+                // remember, set iterators are const!
+                // *insertAt = particle;
+                bestVector_.erase(*insertAt);
+                bestVector_.insert(particle);
             }
             return insertAt==bestVector_.begin();
         }
 
         template<typename Generator>
         particle_type const& getReplacementParticle(Generator& gen) const {
-            typedef BestVector::const_iterator Iter;
+            typedef typename BestVector::const_iterator Iter;
             size_t index(std::min((size_t)(gen() * bestVector_.size()), bestVector_.size()));
             Iter iter(bestVector_.begin());
             for(; index; --index) ++iter; 
