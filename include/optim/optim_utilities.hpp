@@ -138,7 +138,7 @@ namespace optim {
         }
 
         template<typename Particle, typename Bounds>
-        bool checkBounds(Particle const& particle, Bounds const& bounds) {
+        static bool checkBounds(Particle const& particle, Bounds const& bounds) {
             typedef typename Bounds::const_iterator BvIter;
             typedef typename Particle::arg_type::const_iterator PIter;
             BvIter b(bounds.begin());
@@ -150,7 +150,7 @@ namespace optim {
     private:
         // rule 7
         template<typename Particle, typename Bounds, typename Generator>
-        void moveParticleSlightly(Particle& particle, Bounds const& bounds, NT jitter, Generator& gen) const {
+        static void moveParticleSlightly(Particle& particle, Bounds const& bounds, NT jitter, Generator& gen) {
             typedef typename Bounds::const_iterator BvIter;
             typedef typename Particle::arg_type::iterator PIter;
             BvIter bb(bounds.begin());
@@ -164,7 +164,7 @@ namespace optim {
 
         // rule 7
         template<typename Particle, typename Bounds, typename Generator>
-        void moveParticleInbounds(Particle& particle, Bounds const& bounds, NT jitter, Generator& gen) const {
+        static void moveParticleInbounds(Particle& particle, Bounds const& bounds, NT jitter, Generator& gen) {
             typedef typename Bounds::const_iterator BvIter;
             typedef typename Particle::arg_type::iterator PIter;
             BvIter bb(bounds.begin());

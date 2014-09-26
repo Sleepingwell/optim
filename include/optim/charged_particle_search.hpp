@@ -125,7 +125,7 @@ namespace optim {
                 size_t iter, 
                 size_t iterMax,
                 Generator& gen
-            ) {
+            ) const {
                 typedef typename particle_type::arg_type Position;
                 typedef typename particle_type::velocity_type Velocity;
                 typedef typename Position::iterator PIter;
@@ -158,13 +158,13 @@ namespace optim {
 
             //rule1 (qi)
             template<typename Particle>
-            typename Particle::result_type qiFunc(Particle const& i, Particle const& worst, Particle const& best) {
+            static typename Particle::result_type qiFunc(Particle const& i, Particle const& worst, Particle const& best) {
                 return (i.y - worst.y) / (best.y - worst.y);
             }
 
             // rule1 (rij)
             template<typename Position>
-            typename Position::value_type rijFunc(Position const& i, Position const& j, Position const& best, double eps) {
+            static typename Position::value_type rijFunc(Position const& i, Position const& j, Position const& best, double eps) {
                 typedef typename Position::const_iterator Iter;
                 typedef typename Position::value_type distance;
                 distance num(0.0), den(0.0), tmp;
@@ -178,7 +178,7 @@ namespace optim {
 
             // rule 3
             template<typename Particle>
-            bool pijFunc(Particle const& i, Particle const& j, Particle const& best) { // j will attract i
+            static bool pijFunc(Particle const& i, Particle const& j, Particle const& best) { // j will attract i
                 return (j.y >= i.y) || ((i.y - best.y) / (j.y - i.y));
             }
 
