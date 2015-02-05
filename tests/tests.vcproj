@@ -18,8 +18,8 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory="$(VCCBuildRootDir)$(ProjectName)\$(ConfigurationName)"
+			IntermediateDirectory="$(VCCBuildRootDir)$(ProjectName)\$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="1"
 			>
@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\Boost\include\boost-1_46_1"
+				AdditionalIncludeDirectories="C:\boost\boost_1_51"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -90,8 +90,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory="$(VCCBuildRootDir)$(ProjectName)\$(ConfigurationName)"
+			IntermediateDirectory="$(VCCBuildRootDir)$(ProjectName)\$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
@@ -115,7 +115,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\Boost\include\boost-1_46_1"
+				AdditionalIncludeDirectories="C:\boost\boost_1_51"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -182,17 +182,27 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<Filter
+				Name="optim"
+				>
+				<File
+					RelativePath="..\include\optim\charged_particle_search.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\optim\optim_utilities.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\optim\particle_searcher.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\optim\sim_aneal_nelder_mead.hpp"
+					>
+				</File>
+			</Filter>
 		</Filter>
-		<Filter
-			Name="Resource Files"
-			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav"
-			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
-			>
-		</Filter>
-		<File
-			RelativePath=".\ReadMe.txt"
-			>
-		</File>
 	</Files>
 	<Globals>
 	</Globals>

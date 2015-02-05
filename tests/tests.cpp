@@ -61,13 +61,20 @@ template<typename FUNC>
 Res testChargedParticles(FUNC& func, size_t nParticles, size_t nIters) {
     typedef typename optim::Result<double, double> Result;
     typedef optim::Bounds<double> Bounds;
-    int i, ndim(2);
-    Bounds bounds(ndim);
+
+    int
+        i,
+        ndim(2),
+        seed(42);
+
+    Bounds
+        bounds(ndim);
+
     for(i=0; i<ndim; ++i) {
         bounds[i].first = -1.0;
         bounds[i].second = 1.0;
     }
-    Result res(chargedParticleOptimise<double, double>(func, bounds, nIters, nParticles));
+    Result res(chargedParticleOptimise<double, double, double>(func, bounds, nIters, nParticles, seed));
     return Res(nParticles * nIters, res.y);
 }
 
@@ -78,9 +85,11 @@ struct Tester {
 };
 
 int main(int argc, char* argv[]) {
-    Res t1res = testSimAnealNelderMead(50);
-    size_t nParticles(40);
-    size_t nIters(t1res.first/nParticles);
-    Res t2res = testChargedParticles(Tester(), nParticles, 50);
+    //Res t1res = testSimAnealNelderMead(50);
+    size_t
+        nParticles(5);
+
+    //size_t nIters(t1res.first/nParticles);
+    Res t2res = testChargedParticles(Tester(), nParticles, 5);
     return 0;
 }

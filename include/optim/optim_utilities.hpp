@@ -22,6 +22,8 @@
 #include <vector>
 #include <utility>
 #include <set>
+#include <algorithm>
+#include <iterator>
 #include <cassert>
 
 #include <boost/random/mersenne_twister.hpp>
@@ -68,26 +70,73 @@ namespace optim {
 
     template<typename XT, typename YT>
     struct Result {
-        typedef std::vector<XT> arg_type;
+        typedef XT position_element;
+        typedef std::vector<position_element> position_type;
+        typedef typename position_type::iterator position_iterator;
+        typedef typename position_type::const_iterator const_position_iterator;
         typedef YT result_type;
-        Result(void) {}
-        Result(size_t xDim) : x(xDim) { }
-        arg_type x;
-        result_type y;
+
+        Result(size_t nArgs)
+            : position_(nArgs) {
+        }
+
+        virtual ~Result(void) {
+        }
+
+        void swap(Result& other) {
+            this->position_.swap(other.position_);
+            std::swap(this->y, other.y);
+        }
+
+        position_iterator beginPosition(void) {
+            return position_.begin();
+        }
+
+        position_iterator endPosition(void) {
+            return position_.end();
+        }
+
+        const_position_iterator beginPosition(void) const {
+            return position_.begin();
+        }
+
+        const_position_iterator endPosition(void) const {
+            return position_.end();
+        }
+
+        XT getPositionElement(size_t index) const {
+            return position_[index];
+        }
+
+        position_element* positionData(void) {
+            return &position_[0];
+        }
+
+        position_element const* positionData(void) const {
+            return &position_[0];
+        }
+
+        result_type
+            y;
+
+    protected:
+        position_type
+            position_;
     };
 
 
 
 
 
-    template<typename Particle, typename Bounds, typename Generator>
-    void generateRandomPosition(Particle& particle, Bounds const& bounds, Generator& gen) {
-        typedef typename Bounds::const_iterator BvIter;
-        typedef typename Particle::arg_type::iterator PIter;
-        PIter x(particle.x.begin());
-        BvIter b(bounds.begin());
-        for(; b!=bounds.end(); ++b, ++x) {
-            *x = b->first + (b->second - b->first) * gen();
+    template<typename BoundsIter, typename PositionIter, typename Generator>
+    void generateRandomPosition(
+        BoundsIter bBounds,
+        BoundsIter eBounds,
+        PositionIter bPosition,
+        Generator& gen
+    ) {
+        for(; bBounds!=eBounds; ++bBounds, ++bPosition) {
+            *bPosition = bBounds->first + (bBounds->second - bBounds->first) * gen();
         }
     }
 
@@ -96,12 +145,16 @@ namespace optim {
 
 
     template<typename ParticleStore, typename Bounds, typename Generator>
-    void generateRandomParticles(ParticleStore& particles, Bounds const& bounds, Generator& gen) {
+    void generateRandomParticles(
+        ParticleStore& particles,
+        Bounds const& bounds,
+        Generator& gen
+    ) {
         typedef typename ParticleStore::value_type Particle;
         typedef typename ParticleStore::iterator PvIter;
+
         for(PvIter p(particles.begin()); p!=particles.end(); ++p) {
-            *p = Particle(bounds.size());
-            generateRandomPosition(*p, bounds, gen);
+            generateRandomPosition(bounds.begin(), bounds.end(), p->beginPosition(), gen);
         }
     }
 
@@ -119,59 +172,90 @@ namespace optim {
             assert(jitter < 1.0);
         }
 
-        template<typename Particle, typename Alg, typename Generator>
-        void adjustBounds(Particle& particle, Alg const& alg, Generator& gen) const {
-            if(gen() < CMCR_) {
-                if(gen() < PAR_) {
-                    // not sure if this is exactly what was meant... but it seems to make sense.
-                    moveParticleInbounds(particle, alg.getBounds(), jitter_, gen);
-                } else {
-                    // use a previous good particle.
-                    Particle const& p(alg.getBestParticleStore().getReplacementParticle(gen));
-                    std::copy(p.x.begin(), p.x.end(), particle.x.begin());
-                    moveParticleSlightly(particle, alg.getBounds(), jitter_, gen); // I don't think they did this bit.
-                }
-            } else {
-                // select a new random position.
-                generateRandomPosition(particle, alg.getBounds(), gen);
-            }
-        }
 
-        template<typename Particle, typename Bounds>
-        static bool checkBounds(Particle const& particle, Bounds const& bounds) {
+
+        template<typename PositionIter, typename Bounds>
+        static bool checkBoundsOK(
+            PositionIter posIter,
+            Bounds const& bounds
+        ) {
             typedef typename Bounds::const_iterator BvIter;
-            typedef typename Particle::arg_type::const_iterator PIter;
-            BvIter b(bounds.begin());
-            PIter  p(particle.x.begin());
-            for(; b!=bounds.end(); ++b, ++p) if(*p < b->first || *p > b->second) return false;
+
+            BvIter
+                b(bounds.begin()),
+                e(bounds.end());
+
+            for(; b!=e; ++b, ++posIter) if(*posIter < b->first || *posIter > b->second) return false;
+
             return true;
         }
 
+
+
+        template<typename Particle, typename PositionIter, typename Alg, typename Generator>
+        void adjustBounds(
+            Particle const& particle,
+            PositionIter posIter,
+            Alg const& alg,
+            Generator& gen
+        ) const {
+            if(gen() < CMCR_) {
+                if(gen() < PAR_) {
+                    // not sure if this is exactly what was meant... but it seems to make sense.
+                    moveParticleInbounds(posIter, alg.getBounds(), jitter_, gen);
+                } else {
+                    // use a previous good particle.
+                    Particle const&
+                        p(alg.getReplacementParticle());
+
+                    std::copy(p.beginPosition(), p.endPosition(), posIter);
+                    moveParticleSlightly(posIter, alg.getBounds(), jitter_, gen); // I don't think they did this bit.
+                }
+            } else {
+                // select a new random position.
+                generateRandomPosition(alg.getBounds().begin(), alg.getBounds().end(), posIter, gen);
+            }
+        }
+
+
+
     private:
         // rule 7
-        template<typename Particle, typename Bounds, typename Generator>
-        static void moveParticleSlightly(Particle& particle, Bounds const& bounds, NT jitter, Generator& gen) {
+        template<typename PositionIter, typename Bounds, typename Generator>
+        static void moveParticleSlightly(
+            PositionIter posIter,
+            Bounds const& bounds,
+            NT jitter,
+            Generator& gen
+        ) {
             typedef typename Bounds::const_iterator BvIter;
-            typedef typename Particle::arg_type::iterator PIter;
-            BvIter bb(bounds.begin());
-            PIter  pb(particle.x.begin());
-            for(; bb!=bounds.end(); ++bb, ++pb) {
-                *pb += (gen() - 0.5) * jitter;
-                if(*pb < bb->first) *pb = bb->first + gen() * (bb->second - bb->first) * 0.5000001 * jitter;
-                else if(*pb > bb->second) *pb = bb->second - gen() * (bb->second - bb->first) * 0.5000001 * jitter;
+
+            BvIter
+                bb(bounds.begin());
+
+            for(; bb!=bounds.end(); ++bb, ++posIter) {
+                *posIter += (gen() - 0.5) * jitter;
+                if(*posIter < bb->first) *posIter = bb->first + gen() * (bb->second - bb->first) * 0.5000001 * jitter;
+                else if(*posIter > bb->second) *posIter = bb->second - gen() * (bb->second - bb->first) * 0.5000001 * jitter;
             }
         }
 
         // rule 7
-        template<typename Particle, typename Bounds, typename Generator>
-        static void moveParticleInbounds(Particle& particle, Bounds const& bounds, NT jitter, Generator& gen) {
+        template<typename PositionIter, typename Bounds, typename Generator>
+        static void moveParticleInbounds(
+            PositionIter posIter,
+            Bounds const& bounds,
+            NT jitter,
+            Generator& gen
+        ) {
             typedef typename Bounds::const_iterator BvIter;
-            typedef typename Particle::arg_type::iterator PIter;
-            BvIter bb(bounds.begin());
-            PIter  pb(particle.x.begin());
-            for(; bb!=bounds.end(); ++bb, ++pb) {
-                if(*pb < bb->first) *pb = bb->first + gen() * (bb->second - bb->first) * jitter;
-                else if(*pb > bb->second) *pb = bb->second - gen() * (bb->second - bb->first) * jitter;
+
+            BvIter
+                bb(bounds.begin());
+
+            for(; bb!=bounds.end(); ++bb, ++posIter) {
+                if(*posIter < bb->first) *posIter = bb->first + gen() * (bb->second - bb->first) * jitter;
+                else if(*posIter > bb->second) *posIter = bb->second - gen() * (bb->second - bb->first) * jitter;
             }
         }
         
@@ -186,55 +270,91 @@ namespace optim {
 
 
 
-    template<typename Particle>
-    struct BestStoreImpl {
-        typedef Particle particle_type;
+    //template<typename Particle>
+    //struct BestStoreImpl {
+    //    typedef Particle particle_type;
 
-    private:
-        struct BPC {
-            bool operator()(particle_type const& a, particle_type const& b) const { 
-                return a.y < b.y;
-            }
-        };
-        typedef std::set<particle_type, BPC> BestVector;
+    //private:
+    //    struct BPC {
+    //        bool operator()(particle_type const& a, particle_type const& b) const { 
+    //            return a.y > b.y;
+    //        }
+    //    };
+    //    typedef std::set<particle_type, BPC> BestVector;
 
-    public:
-        BestStoreImpl(size_t size) : maxSize_(size) {}
 
-        bool addToStore(particle_type const& particle) {
-            typedef typename BestVector::iterator Iter;
-            bool inserted(false);
-            if(bestVector_.size() < maxSize_) {
-                bestVector_.insert(particle);
-                inserted = true;
-            }
-            Iter insertAt(bestVector_.upper_bound(particle));
-            if(!inserted && insertAt!=bestVector_.end()) {
-                // remember, set iterators are const!
-                // *insertAt = particle;
-                bestVector_.erase(*insertAt);
-                bestVector_.insert(particle);
-            }
-            return insertAt==bestVector_.begin();
-        }
 
-        template<typename Generator>
-        particle_type const& getReplacementParticle(Generator& gen) const {
-            typedef typename BestVector::const_iterator Iter;
-            size_t index(std::min((size_t)(gen() * bestVector_.size()), bestVector_.size()));
-            Iter iter(bestVector_.begin());
-            for(; index; --index) ++iter; 
-            return *iter;
-        }
+    //public:
+    //    BestStoreImpl(size_t size) : maxSize_(size) {}
 
-        particle_type const& getBestParticle(void) const {
-            return *bestVector_.begin();
-        }
 
-    private:
-        size_t maxSize_;
-        BestVector bestVector_;
-    };
+
+    //    bool addToStore(particle_type const& particle) {
+    //        typedef typename BestVector::iterator Iter;
+
+    //        bool
+    //            inserted(false);
+
+    //        if(bestVector_.size() < maxSize_) {
+    //            bestVector_.insert(particle);
+    //            inserted = true;
+    //        }
+
+    //        Iter
+    //            insertAt(bestVector_.lower_bound(particle));
+
+    //        bool
+    //            isBest(insertAt == bestVector_.begin());
+
+    //        if(!inserted && insertAt!=bestVector_.end()) {
+    //            // remember, set iterators are const!
+    //            // *insertAt = particle;
+    //            bestVector_.erase(*insertAt);
+    //            bestVector_.insert(particle);
+    //        }
+
+    //        return isBest;
+    //    }
+
+
+
+    //template<typename StoreIter, typename Generator>
+    //particle_type const& getReplacementParticle(
+    //    StoreIter b,
+    //    StoreIter e,
+    //    Generator& gen
+    //) const {
+    //    typedef typename BestVector::const_iterator Iter;
+
+    //    size_t
+    //        nInStore(std::distance(b, e)),
+    //        index(static_cast<size_t>(gen() * nInStore));
+
+    //    assert(nInStore > 0);
+
+    //    if(index == nInStore) {
+    //        // can only happen if we got 1.0 from gen()
+    //        index = nInStore - 1;
+    //    }
+
+    //    return *(b + index);
+    //}
+
+
+
+        //particle_type const& getBestParticle(void) const {
+        //    return *bestVector_.begin();
+        //}
+
+
+
+    //private:
+    //    size_t
+    //        maxSize_;
+
+    //    BestVector
+    //        bestVector_;
+    //};
 
 
 

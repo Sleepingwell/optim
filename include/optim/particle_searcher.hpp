@@ -20,142 +20,157 @@
 #define OPTIM_PARTICLE_SEARCHER_HEADER_INCLUDED_ODIJWPEUP5OIJRSDLFGJOH
 
 #include <vector>
+#include <algorithm>
 
 #include "optim_utilities.hpp"
 
-#define CPO_CM_FRAC 4
+#define BEST_STORE_SIZE 5
 
 namespace optim {
     template<
         typename Super,
-        typename XT, 
-        typename YT,
+        typename XT, // argument type
+        typename YT, // fitness type
         typename Particle,
-        typename Result=Particle,
+        typename Result,
         typename BoundsAdjustor=DefaultBoundsAdjustor<XT>,
         typename Stopper=DefaultStoppingRule,
         typename Generator=UniformGenerator<XT>,
         typename Bounds=Bounds<XT>,
-        typename BestStore=BestStoreImpl<Particle>,
         typename ParticleStore=std::vector<Particle>
     >
     class ParticleSearcher {
+        typedef Super super_type;
+
     public:
         typedef Particle particle_type;
         typedef Result result_type;
-        typedef BestStore best_particle_store_type;
         typedef Bounds bounds_type;
         typedef ParticleStore particle_store_type;
-
-    private:
-        typedef typename particle_store_type::iterator ParticleVectorIterator;
 
     public:
         ParticleSearcher(
             bounds_type const& bounds,
             BoundsAdjustor const& boundsAdjustor,
             Stopper const& stopper,
-            size_t nParticles
-        ) : bounds_(bounds),
-            stopper_(stopper),
+            size_t nParticles,
+            int seed
+        ) : gen_(seed),
+            bounds_(bounds),
             boundsAdjustor_(boundsAdjustor),
-            particles_(nParticles),
-            bestStore_(nParticles/CPO_CM_FRAC)
+            stopper_(stopper),
+            particles_(nParticles, particle_type(bounds.size()))
         {
-            if(nParticles < CPO_CM_FRAC) {
-                // should emit a warning (somehow) here.
-                particles_ = particle_store_type(CPO_CM_FRAC);
-                bestStore_ = best_particle_store_type(1);
+            size_t
+                nArgs(bounds.size());
+
+            for(typename bounds_type::const_iterator b(bounds.begin()), e(bounds.end()); b!=e; ++b) {
+                if(b->first >= b->second) throw std::runtime_error("bounds.first >= bound.second");
             }
         }
 
 
         template<typename FUNC>
-        particle_type const& run(FUNC func, size_t iters) {
-            typedef typename particle_type::arg_type Position;
-            typedef typename particle_type::arg_type::iterator PIter;
+        particle_type const& run(FUNC fit, size_t iters) {
+            typedef typename particle_type::position_type position_type;
+            typedef typename position_type::iterator PosIter;
             typedef typename particle_type::velocity_type::iterator VIter;
+            typedef typename particle_store_type::iterator storeIter;
 
-            size_t size(bounds_.size()), currParticleIndex, nextWorstIndex;
-            YT worstValue(-std::numeric_limits<YT>::infinity()), nextWorstValue(worstValue);
-            ParticleVectorIterator pvi;
-            Position oldPos(bounds_.size());
-            // use rule 2
+            size_t
+                nArgs(bounds_.size());
+
+            position_type
+                newPos(nArgs * particles_.size()); // buffer for new positions
+
+            PosIter
+                newPosIter;
+
+            // use rule 2 - fill the particles with random locatiions
             generateRandomParticles(particles_, bounds_, gen_);
-            // evaluate func for all the particles.
-            for(pvi=particles_.begin(), currParticleIndex=0; pvi!=particles_.end(); ++pvi, ++currParticleIndex) {
-                pvi->y = func(&pvi->x[0], size);
-                // use rule 6
-                bestStore_.addToStore(*pvi);
-                if(pvi->y > nextWorstValue) {
-                    nextWorstValue = pvi->y;
-                    nextWorstIndex = currParticleIndex;
-                }
-                if(pvi->y > worstValue || currParticleIndex == worstParticleIndex_) {
-                    worstValue = nextWorstValue;
-                    worstParticleIndex_ = nextWorstIndex;
-                    nextWorstValue = -std::numeric_limits<YT>::infinity();
-                }
+
+            storeIter
+                pvi, pve;
+
+            // evaluate the fitness of every particle
+            for(pvi=particles_.begin(), pve=particles_.end(); pvi!=pve; ++pvi) {
+                pvi->y = fit(pvi->positionData(), nArgs);
             }
-            
-            // use rule 8 (stopping proceedure) - max number of iterations.
+
+            // sort the particles according to fitness
+            std::sort(particles_.begin(), particles_.end());
+
+            // run the iterations.
             for(currentIteration_=0; currentIteration_<iters; ++currentIteration_) {
-                for(pvi=particles_.begin(), currParticleIndex=0; pvi!=particles_.end(); ++pvi, ++currParticleIndex) {
-                    // use rules 4 and 5
-                    std::copy(pvi->x.begin(), pvi->x.end(), oldPos.begin());
-                    static_cast<Super*>(this)->updateParticle(*pvi, currentIteration_, iters, gen_);
-                    if(!boundsAdjustor_.checkBounds(*pvi, bounds_)) {
-                        // use rule 7
-                        boundsAdjustor_.adjustBounds(*pvi, *this, gen_);
-                        pvi->adjustForPositionChange(oldPos);
-                    }
-                    pvi->y = func(&pvi->x[0], size);
-                    // use rule 6
-                    if(!bestStore_.addToStore(*pvi) && pvi->y > nextWorstValue) {
-                        nextWorstValue = pvi->y;
-                        nextWorstIndex = currParticleIndex;
-                    }
-                    if(pvi->y > worstValue || currParticleIndex == worstParticleIndex_) {
-                        worstValue = nextWorstValue;
-                        worstParticleIndex_ = nextWorstIndex;
-                        nextWorstValue = -std::numeric_limits<YT>::infinity();
+
+                // initialise the new particle positions to zero
+                std::fill(newPos.begin(), newPos.end(), 0.0);
+
+                // get the new positions of the particles
+                for(pvi=particles_.begin(), pve=particles_.end(), newPosIter=newPos.begin(); pvi!=pve; ++pvi, newPosIter+=nArgs) {
+
+                    // use rules 4 and 5 - get the particles new position
+                    static_cast<Super*>(this)->updateParticle(*pvi, newPosIter, currentIteration_, iters, gen_);
+                    if(!boundsAdjustor_.checkBoundsOK(newPosIter, bounds_)) {
+                        // use rule 7 - ajust the new position if reqired
+                        boundsAdjustor_.adjustBounds(*pvi, newPosIter, *this, gen_);
                     }
                 }
+
+                // update the positions of the particles
+                for(pvi=particles_.begin(), pve=particles_.end(), newPosIter=newPos.begin(); pvi!=pve; ++pvi, newPosIter+=nArgs) {
+                    pvi->updateForPositionChange(newPosIter, newPosIter+nArgs);
+                    pvi->y = fit(pvi->positionData(), nArgs);
+                }
+
+                std::sort(particles_.begin(), particles_.end());
+
+                // use rule 8 (stopping proceedure)
                 if(stopper_(*this)) break;
             }
-            return bestStore_.getBestParticle();
-        }
 
-        particle_store_type const& getParticleStore(void) const {
-            return particles_;
-        }
-
-        best_particle_store_type const& getBestParticleStore(void) const {
-            return bestStore_;
-        }
-
-        particle_type const& getWorstParticle(void) const {
-            return particles_[worstParticleIndex_];
-        }
-
-        particle_type const& getBestParticle(void) const {
-            return bestStore_.getBestParticle();
+            return static_cast<super_type const*>(this)->getBestParticle();
         }
 
         bounds_type const& getBounds(void) const {
             return bounds_;
         }
 
-    private:
-        Generator gen_;
-        bounds_type bounds_;
-        BoundsAdjustor boundsAdjustor_;
-        Stopper stopper_;
-        particle_store_type particles_;
-        best_particle_store_type bestStore_;
-        size_t worstParticleIndex_;
-        size_t currentIteration_;
+        particle_type const& getReplacementParticle(void) const {
+            return static_cast<super_type const*>(this)->getReplacementParticle();
+        }
 
+    protected:
+        particle_store_type const& getParticleStore(void) const {
+            return particles_;
+        }        
+
+        particle_store_type& getParticleStore(void) {
+            return particles_;
+        }
+
+        double rand(void) const {
+            return gen_();
+        }
+
+    private:
+        size_t
+            currentIteration_;
+
+        mutable Generator
+            gen_;
+
+        bounds_type
+            bounds_;
+
+        BoundsAdjustor
+            boundsAdjustor_;
+
+        Stopper
+            stopper_;
+
+        particle_store_type
+            particles_;
     };
 } // end namespace optim
 
